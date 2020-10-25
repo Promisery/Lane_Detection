@@ -8,12 +8,10 @@ import time
 def transform(image, reverse=False):
     height = image.shape[0]
     width = image.shape[1]
-    if not reverse:
-        pts1 = np.float32([[330, 720], [448, 504], [1010, 720], [790, 504]])
-        pts2 = np.float32([[330, 720], [330, 504], [1010, 720], [1010, 504]])
-    else:
-        pts2 = np.float32([[330, 720], [448, 504], [1010, 720], [790, 504]])
-        pts1 = np.float32([[330, 720], [330, 504], [1010, 720], [1010, 504]])
+    pts1 = np.float32([[330, 720], [448, 504], [1010, 720], [790, 504]])
+    pts2 = np.float32([[330, 720], [330, 288], [1010, 720], [1010, 288]])
+    if reverse:
+        pts1, pts2 = pts2, pts1
     M = cv2.getPerspectiveTransform(pts1, pts2)
     image = cv2.warpPerspective(image, M, (width, height))
     if not reverse:
@@ -40,15 +38,24 @@ def roi(image):
 
 def detect_edge(image):
     img = np.copy(image)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    print(gray.shape)
+
+    mask = (cv2.inRange(gray, np.array([0., 0., 0.517]) * 255, np.array([1., 1., 1.]) * 255) / 255).astype(np.bool)
+    img[np.invert(np.stack((mask, mask, mask), -1))] = 0
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    kernel = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    sharp = cv2.addWeighted(gray, 1, kernel, 0, 0)
+    # cv2.imshow('hsv', img)
+    
+    # kernel = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    low_thres = 20
-    high_thres = 50
-    # blur = cv2.GaussianBlur(gray, (9, 9), 0)
-    canny = cv2.Canny(sharp, low_thres, high_thres)
+    # sharp = cv2.addWeighted(gray, 1, kernel, 0, 0)
+
+    low_thres = 50
+    high_thres = 150
+    # blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    canny = cv2.Canny(gray, low_thres, high_thres)
+    canny = roi(canny)
     cv2.imshow('edge', canny)
     return canny
 
@@ -133,9 +140,8 @@ def play_video(file):
         if frame is None:
             break
         img = np.copy(frame)
-        img = transform(img)
-        # img = roi(img)
         img = detect_edge(img)
+        img = transform(img)
         # img = roi(img)
         lines = detect_line(img)
         # print(lines)
